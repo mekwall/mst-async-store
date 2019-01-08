@@ -7,7 +7,7 @@ import {
   hasParent,
 } from 'mobx-state-tree';
 import { now } from 'mobx-utils';
-import asap from 'asap';
+import nextTick from 'next-tick';
 
 export interface VolatileAsyncContainerState {
   isReady: boolean;
@@ -113,7 +113,7 @@ export function createAsyncContainer<T extends IAnyModelType>(
       get value() {
         if (self.shouldFetch) {
           // Hack to allow side-effects in a view
-          asap(() => {
+          nextTick(() => {
             // Need to check shouldFetch again to avoid race-conditions
             // This is cheap since it's memoized
             if (self.shouldFetch) {

@@ -9,7 +9,7 @@ import {
   ModelInstanceType,
   types,
 } from 'mobx-state-tree';
-import asap from 'asap';
+import nextTick from 'next-tick';
 import { createAsyncContainer } from './createAsyncContainer';
 
 export type AsyncFetchActions<T> = (
@@ -205,7 +205,7 @@ export function createAsyncStore<T extends IAnyModelType>(
           self.containers.get(id) || AsyncContainer.create({ id } as any);
         if (ct.shouldFetch && !self.containers.has(id)) {
           // Hack to fool mobx into allowing side-effects in a view
-          asap(() => {
+          nextTick(() => {
             self.fetchOne(id, ct);
           });
         }
@@ -219,7 +219,7 @@ export function createAsyncStore<T extends IAnyModelType>(
         const ctsToFetch = cts.filter((ct) => ct && ct.shouldFetch);
         if (ctsToFetch.length > 0) {
           // Hack to fool mobx into allowing side-effects in a view
-          asap(() => {
+          nextTick(() => {
             self.fetchMany(ids, ctsToFetch);
           });
         }
@@ -228,7 +228,7 @@ export function createAsyncStore<T extends IAnyModelType>(
       getAll() {
         if (!self.isReady) {
           // Hack to fool mobx into allowing side-effects in a view
-          asap(() => {
+          nextTick(() => {
             self.fetchAll();
           });
         }
