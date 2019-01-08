@@ -1,6 +1,14 @@
 {
   "name": "mst-async-store",
   "description": "Asynchronous store and container implementation for mobx-state-tree",
+  "keywords": [
+    "mobx",
+    "mobx-state-tree",
+    "async",
+    "asynchronous",
+    "store",
+    "container"
+  ],
   "version": "0.0.0-semantic-release",
   "author": "Marcus Ekwall <marcus.ekwall@gmail.com>",
   "license": "ISC",
