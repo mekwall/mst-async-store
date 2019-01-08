@@ -42,6 +42,7 @@ jobs:
       - run:
           name: Build
           command: yarn build
-      # - run:
-      #    name: Release and publish
-      #    command: yarn release
+
+      - run:
+          name: Release and publish
+          command: yarn release
