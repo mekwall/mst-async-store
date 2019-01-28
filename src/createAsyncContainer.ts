@@ -1,10 +1,10 @@
 import {
-  types,
-  IAnyModelType,
-  isAlive,
   getParent,
-  Instance,
   hasParent,
+  IAnyModelType,
+  Instance,
+  isAlive,
+  types,
 } from 'mobx-state-tree';
 import { now } from 'mobx-utils';
 import nextTick from 'next-tick';
@@ -20,8 +20,8 @@ export interface VolatileAsyncContainerState {
 export interface AsyncContainerOptions<T> {
   ttl?: number;
   failstateTtl?: number;
-  fetch?(id?: string): PromiseLike<Instance<T>>;
   name?: string;
+  fetch?(id?: string): PromiseLike<Instance<T>>;
 }
 
 export function createAsyncContainer<T extends IAnyModelType>(

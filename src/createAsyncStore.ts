@@ -12,30 +12,41 @@ import {
 import nextTick from 'next-tick';
 import { createAsyncContainer } from './createAsyncContainer';
 
+type ReturnValueArray<T> = Array<Instance<T>>;
+type ReturnValueMap<T> = Dict<Instance<T> | Error>;
+
 export type AsyncFetchActions<T> = (
   self: ModelInstanceType<any, any, any, any>
 ) => {
   fetchOne?(id: string): Promise<Instance<T> | undefined>;
-  fetchMany?(ids: string[]): Promise<Array<Instance<T>>>;
-  fetchAll?(): Promise<Array<Instance<T>>>;
+  fetchMany?(ids: string[]): Promise<ReturnValueArray<T> | ReturnValueMap<T>>;
+  fetchAll?(): Promise<ReturnValueArray<T> | ReturnValueMap<T>>;
 };
 
 export interface VolatileAsyncStoreState {
   isPending: boolean;
   isReady: boolean;
   fetchQueue: string[];
+  error?: Error;
+}
+
+export interface AsyncStoreOptions {
+  ttl?: number;
+  failstateTtl?: number;
+  batch?: number;
 }
 
 export function createAsyncStore<T extends IAnyModelType>(
   name: string,
   ItemModel: T,
   fetchActions?: AsyncFetchActions<T>,
-  options = {
-    ttl: 0,
-    failstateTtl: 10000,
-  }
+  options?: AsyncStoreOptions
 ) {
-  const AsyncContainer = createAsyncContainer<T>(ItemModel, options);
+  const { ttl = 0, failstateTtl = 10000, batch = 40 } = options || {};
+  const AsyncContainer = createAsyncContainer<T>(ItemModel, {
+    ttl,
+    failstateTtl,
+  });
   type AsyncContainerShape = Instance<typeof AsyncContainer>;
 
   return types
@@ -47,12 +58,25 @@ export function createAsyncStore<T extends IAnyModelType>(
       isPending: false,
       isReady: false,
     }))
+    .views((self) => ({
+      get errors(): Dict<Error> {
+        return values(self.containers).reduce((acc, c) => {
+          return { ...acc, [c.id]: c.error };
+        }, {});
+      },
+    }))
+    .views((self) => ({
+      get inFailstate() {
+        return Object.keys(self.errors).length > 0;
+      },
+    }))
     .actions((self) => ({
       setReady() {
         self.isPending = false;
         self.isReady = true;
       },
       setPending() {
+        self.error = undefined;
         self.isPending = true;
       },
       hotReload() {
@@ -82,18 +106,30 @@ export function createAsyncStore<T extends IAnyModelType>(
             throw new Error("Store doesn't support fetchAll");
           }
           self.setPending();
-          const items = yield client.fetchAll();
-          if (items.length > 0) {
-            items.forEach((item: any) => {
-              const ct =
-                self.containers.get(item.id) ||
-                AsyncContainer.create({ id: item.id } as any);
-              const idx = self.fetchQueue.indexOf(item.id);
-              self.fetchQueue.splice(idx, 1);
-              ct.setValue(item);
-              self.containers.set(item.id, ct);
-            });
+          let items:
+            | ReturnValueArray<T>
+            | ReturnValueMap<T> = yield client.fetchAll();
+
+          if (Array.isArray(items)) {
+            items = items.reduce(
+              (acc, item) => ({ ...acc, [item.id]: item }),
+              {}
+            );
           }
+
+          Object.keys(items).forEach((id) => {
+            const ct =
+              self.containers.get(id) || AsyncContainer.create({ id } as any);
+            const itemOrError = (items as ReturnValueMap<T>)[id];
+            const idx = self.fetchQueue.indexOf(id);
+            self.fetchQueue.splice(idx, 1);
+            if (itemOrError instanceof Error) {
+              ct.setFailstate(itemOrError);
+            } else {
+              ct.setValue(itemOrError);
+            }
+            self.containers.set(id, ct);
+          });
           self.setReady();
         }),
         _fetchMany: flow(function*(ids: string[]) {
@@ -107,10 +143,27 @@ export function createAsyncStore<T extends IAnyModelType>(
             return ct;
           });
           try {
-            const items = yield client.fetchMany(ids);
-            items.forEach((item: Instance<T>) => {
-              const ct = self.containers.get(item.id)!;
-              ct.setValue(item);
+            let items:
+              | ReturnValueArray<T>
+              | ReturnValueMap<T> = yield client.fetchMany(ids);
+
+            if (Array.isArray(items)) {
+              items = items.reduce(
+                (acc, item) => ({ ...acc, [item.id]: item }),
+                {}
+              );
+            }
+
+            Object.keys(items).forEach((id) => {
+              const ct = self.containers.get(id)!;
+              const itemOrError = (items as ReturnValueMap<T>)[id];
+              const idx = self.fetchQueue.indexOf(id);
+              self.fetchQueue.splice(idx, 1);
+              if (itemOrError instanceof Error) {
+                ct.setFailstate(itemOrError);
+              } else {
+                ct.setValue(itemOrError);
+              }
             });
           } catch (e) {
             cts.forEach((ct) => {
@@ -141,6 +194,7 @@ export function createAsyncStore<T extends IAnyModelType>(
           return AsyncContainer.create({ id } as any);
         },
         afterCreate() {
+          const client = fetchActions ? fetchActions(self) : {};
           addDisposer(
             self,
             reaction(
@@ -153,9 +207,9 @@ export function createAsyncStore<T extends IAnyModelType>(
                     self.spliceFetchQueue(fetchAllIndex, 1);
                     self._fetchAll();
                   } else {
-                    // Batch 40 items at a time
-                    const idsToFetch = self.spliceFetchQueue(0, 40);
-                    if (idsToFetch.length === 1) {
+                    // Batch fetching
+                    const idsToFetch = self.spliceFetchQueue(0, batch);
+                    if (idsToFetch.length === 1 && client.fetchOne) {
                       self._fetchOne(idsToFetch[0]);
                     } else {
                       self._fetchMany(idsToFetch);
