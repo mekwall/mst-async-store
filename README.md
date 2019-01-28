@@ -19,10 +19,12 @@ import { when } from 'mobx';
 import { createAsyncStore } from 'mst-async-store';
 
 // Generate store model
-const MyAsyncStore = createAsyncStore(
-  'MyAsyncStore', // Name of store
-  MyModel, // Your MST model representing one item
-  (self) => (
+const MyAsyncStore = createAsyncStore({
+  name: 'MyAsyncStore',
+  itemModel: MyModel,
+  ttl: 10000,
+  failstateTtl: 5000
+  fetchActions: (self) => (
     {
       // Logic to fetch one item
       async fetchOne(id: string) {
@@ -39,11 +41,9 @@ const MyAsyncStore = createAsyncStore(
         const data = await axios.get(`/all`);
         return data.response.map((d) => MyModel.create(d));
       },
-    },
-    // Store options
-    { ttl: 10000, failstateTtl: 5000 }
+    }
   )
-);
+});
 
 // Instantiate store
 const myAsyncStore = MyAsyncStore.create();

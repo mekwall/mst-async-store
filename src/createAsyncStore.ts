@@ -30,20 +30,27 @@ export interface VolatileAsyncStoreState {
   error?: Error;
 }
 
-export interface AsyncStoreOptions {
+export interface AsyncStoreOptions<T extends IAnyModelType> {
+  name?: string;
+  itemModel: T;
   ttl?: number;
   failstateTtl?: number;
   batch?: number;
+  fetchActions?: AsyncFetchActions<T>;
 }
 
 export function createAsyncStore<T extends IAnyModelType>(
-  name: string,
-  ItemModel: T,
-  fetchActions?: AsyncFetchActions<T>,
-  options?: AsyncStoreOptions
+  options: AsyncStoreOptions<T>
 ) {
-  const { ttl = 0, failstateTtl = 10000, batch = 40 } = options || {};
-  const AsyncContainer = createAsyncContainer<T>(ItemModel, {
+  const {
+    name = 'AnonymouseAsyncStore',
+    itemModel,
+    ttl = 0,
+    failstateTtl = 10000,
+    batch = 40,
+    fetchActions,
+  } = options;
+  const AsyncContainer = createAsyncContainer<T>(itemModel, {
     ttl,
     failstateTtl,
   });
