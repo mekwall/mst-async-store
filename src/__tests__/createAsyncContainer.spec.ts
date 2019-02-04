@@ -21,6 +21,14 @@ describe('createAsyncContainer', () => {
     expect(container.value).toBeUndefined();
   });
 
+  it('should be set to ready', () => {
+    const AsyncContainer = createAsyncContainer(DummyModel);
+    const container = AsyncContainer.create({ id: 'foo' });
+    expect(container.isReady).toBe(false);
+    container.setReady();
+    expect(container.isReady).toBe(true);
+  });
+
   it('should have correct state when value is set', () => {
     const AsyncContainer = createAsyncContainer(DummyModel);
     const container = AsyncContainer.create({ id: 'foo' });
@@ -39,12 +47,26 @@ describe('createAsyncContainer', () => {
     });
     const container = AsyncContainer.create({ id: 'foo' });
     container.setFailstate(new Error('Dummy Error'));
+    const error = container.getFailstate();
+    expect(error).toBeDefined();
     expect(container.id).toBe('foo');
     expect(container.isReady).toBe(true);
     expect(container.isPending).toBe(false);
     expect(container.inFailstate).toBe(true);
     expect(container.shouldFetch).toBe(false);
     expect(container.value).toBeUndefined();
+  });
+
+  it('should clear failstate', () => {
+    const AsyncContainer = createAsyncContainer(DummyModel, {
+      failstateTtl: 0,
+    });
+    const container = AsyncContainer.create({ id: 'foo' });
+    container.setFailstate(new Error('Dummy Error'));
+    expect(container.inFailstate).toBe(true);
+    container.clearFailstate();
+    expect(container.inFailstate).toBe(false);
+    expect(container.shouldFetch).toBe(true);
   });
 
   it('should fetch value when fetch option is passed and value is accessed', async () => {
