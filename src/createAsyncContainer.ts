@@ -72,9 +72,6 @@ export function createAsyncContainer<T extends IAnyModelType>(
       getFailstate: () => {
         return self.error;
       },
-      clearFailstate: () => {
-        self.error = undefined;
-      },
       get hasExpired() {
         return (
           self.expiresAt > 0 && now(ttl < 1000 ? ttl : 1000) >= self.expiresAt
@@ -97,6 +94,9 @@ export function createAsyncContainer<T extends IAnyModelType>(
         self.lastModified = Date.now();
         self.expiresAt =
           failstateTtl > 0 ? self.lastModified + failstateTtl : 0;
+      },
+      clearFailstate: () => {
+        self.error = undefined;
       },
     }))
     .actions((self) => ({
