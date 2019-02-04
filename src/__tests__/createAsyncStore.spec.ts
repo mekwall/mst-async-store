@@ -173,4 +173,25 @@ describe('createAsyncStore', () => {
     expect(container.value).toBe(dummyItem);
     expect(container.id).toBe('foo');
   });
+
+  it('should trigger fetch from empty container when shouldFetch is true', async () => {
+    const dummyItem = DummyModel.create({ id: 'foo' });
+    const AsyncStore = createAsyncStore({
+      name: 'AsyncStore',
+      itemModel: DummyModel,
+      fetchActions: () => ({
+        async fetchOne() {
+          return dummyItem;
+        },
+      }),
+    });
+    const asyncStore = AsyncStore.create();
+    const emptyContainer = asyncStore.createAsyncContainer('foo');
+    expect(emptyContainer.isReady).toBe(false);
+    expect(emptyContainer.shouldFetch).toBe(true);
+    const value = emptyContainer.value;
+    expect(value).toBeUndefined();
+    await when(() => emptyContainer.isReady);
+    expect(emptyContainer.value).toBe(dummyItem);
+  });
 });

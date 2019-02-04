@@ -210,7 +210,11 @@ export function createAsyncStore<
     .actions((self) => {
       return {
         createAsyncContainer(id: string) {
-          return AsyncContainer.create({ id } as any);
+          if (self.containers.has(id)) {
+            throw Error(`Container with id ${id} already exists`);
+          }
+          self.containers.put({ id, _value: undefined as any });
+          return self.containers.get(id)!;
         },
         afterCreate() {
           const client = fetchActions ? fetchActions(self) : {};

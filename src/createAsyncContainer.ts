@@ -30,7 +30,7 @@ export interface AsyncContainerOptions<T> {
 
 export type AsyncContainerModel<I extends IAnyModelType> = IModelType<
   ModelPropertiesDeclarationToProperties<{
-    id: IMaybe<ISimpleType<string>>;
+    id: ISimpleType<string>;
     _value: IMaybe<I>;
   }>,
   VolatileAsyncContainerState & {
@@ -58,7 +58,7 @@ export function createAsyncContainer<T extends IAnyModelType>(
   } = options;
   return types
     .model(name, {
-      id: types.maybe(types.identifier),
+      id: types.identifier,
       _value: types.maybe(ItemModel),
     })
     .volatile<VolatileAsyncContainerState>(() => ({
@@ -141,10 +141,12 @@ export function createAsyncContainer<T extends IAnyModelType>(
             // Need to check shouldFetch again to avoid race-conditions
             // This is cheap since it's memoized
             if (self.shouldFetch) {
-              if (hasParent(self)) {
-                const parent: any = getParent(self);
+              if (hasParent(self, 2)) {
+                const parent: any = getParent(self, 2);
                 if (parent.fetchOne) {
                   parent.fetchOne(self.id);
+                } else if (parent.fetchMany) {
+                  parent.fetchMany([self.id]);
                 }
               } else if (options.fetch) {
                 options.fetch(self.id).then((result) => {
