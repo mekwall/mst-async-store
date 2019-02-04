@@ -1,6 +1,7 @@
 import { createAsyncStore } from '../createAsyncStore';
 import { types } from 'mobx-state-tree';
 import { when } from 'mobx';
+import { createAsyncContainer } from '../createAsyncContainer';
 
 const DummyModel = types.model('DummyModel', { id: types.identifier });
 
@@ -151,5 +152,25 @@ describe('createAsyncStore', () => {
     expect(asyncStore._fetchAll()).rejects.toEqual(
       Error("Store doesn't support fetchAll")
     );
+  });
+
+  it('should accept custom AsyncContainer', async () => {
+    const AsyncContainer = createAsyncContainer(DummyModel);
+    const dummyItem = DummyModel.create({ id: 'foo' });
+    const AsyncStore = createAsyncStore({
+      name: 'AsyncStore',
+      containerModel: AsyncContainer,
+      itemModel: DummyModel,
+      fetchActions: () => ({
+        async fetchOne() {
+          return dummyItem;
+        },
+      }),
+    });
+    const asyncStore = AsyncStore.create();
+    const container = asyncStore.getOne('foo');
+    await when(() => asyncStore.isReady && container.isReady);
+    expect(container.value).toBe(dummyItem);
+    expect(container.id).toBe('foo');
   });
 });

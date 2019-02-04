@@ -1,10 +1,14 @@
 import {
-  getParent,
-  hasParent,
-  IAnyModelType,
-  Instance,
-  isAlive,
   types,
+  IAnyModelType,
+  isAlive,
+  getParent,
+  Instance,
+  hasParent,
+  IModelType,
+  ISimpleType,
+  IMaybe,
+  ModelPropertiesDeclarationToProperties,
 } from 'mobx-state-tree';
 import { now } from 'mobx-utils';
 import nextTick from 'next-tick';
@@ -20,9 +24,28 @@ export interface VolatileAsyncContainerState {
 export interface AsyncContainerOptions<T> {
   ttl?: number;
   failstateTtl?: number;
-  name?: string;
   fetch?(id?: string): PromiseLike<Instance<T>>;
+  name?: string;
 }
+
+export type AsyncContainerModel<I extends IAnyModelType> = IModelType<
+  ModelPropertiesDeclarationToProperties<{
+    id: IMaybe<ISimpleType<string>>;
+    _value: IMaybe<I>;
+  }>,
+  VolatileAsyncContainerState & {
+    getFailstate(): undefined | Error;
+    clearFailstate(): void;
+    readonly hasExpired: boolean;
+    setReady(): void;
+    setPending(): void;
+    setFailstate(e: Error): void;
+    setValue(value: Instance<IAnyModelType>): void;
+    readonly inFailstate: boolean;
+    readonly shouldFetch: boolean;
+    readonly value: undefined | Instance<IAnyModelType>;
+  }
+>;
 
 export function createAsyncContainer<T extends IAnyModelType>(
   ItemModel: T,

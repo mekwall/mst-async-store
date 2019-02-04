@@ -10,7 +10,11 @@ import {
   types,
 } from 'mobx-state-tree';
 import nextTick from 'next-tick';
-import { createAsyncContainer } from './createAsyncContainer';
+import {
+  createAsyncContainer,
+  AsyncContainerModel,
+} from './createAsyncContainer';
+import { _NotCustomized } from 'mobx-state-tree/dist/internal';
 
 type ReturnValueArray<T> = Array<Instance<T>>;
 type ReturnValueMap<T> = Dict<Instance<T> | Error>;
@@ -30,30 +34,36 @@ export interface VolatileAsyncStoreState {
   error?: Error;
 }
 
-export interface AsyncStoreOptions<T extends IAnyModelType> {
+export interface AsyncStoreOptions<ITEM, CONTAINER> {
   name?: string;
-  itemModel: T;
+  itemModel: ITEM;
+  containerModel?: CONTAINER;
   ttl?: number;
   failstateTtl?: number;
   batch?: number;
-  fetchActions?: AsyncFetchActions<T>;
+  fetchActions?: AsyncFetchActions<ITEM>;
 }
 
-export function createAsyncStore<T extends IAnyModelType>(
-  options: AsyncStoreOptions<T>
-) {
+export function createAsyncStore<
+  ITEM extends IAnyModelType,
+  CONTAINER extends AsyncContainerModel<ITEM>
+>(options: AsyncStoreOptions<ITEM, CONTAINER>) {
   const {
     name = 'AnonymouseAsyncStore',
     itemModel,
+    containerModel,
     ttl = 0,
     failstateTtl = 10000,
     batch = 40,
     fetchActions,
   } = options;
-  const AsyncContainer = createAsyncContainer<T>(itemModel, {
-    ttl,
-    failstateTtl,
-  });
+
+  const AsyncContainer =
+    containerModel ||
+    createAsyncContainer<ITEM>(itemModel, {
+      ttl,
+      failstateTtl,
+    });
   type AsyncContainerShape = Instance<typeof AsyncContainer>;
 
   return types
@@ -114,8 +124,8 @@ export function createAsyncStore<T extends IAnyModelType>(
           }
           self.setPending();
           let items:
-            | ReturnValueArray<T>
-            | ReturnValueMap<T> = yield client.fetchAll();
+            | ReturnValueArray<ITEM>
+            | ReturnValueMap<ITEM> = yield client.fetchAll();
 
           if (Array.isArray(items)) {
             items = items.reduce(
@@ -127,8 +137,10 @@ export function createAsyncStore<T extends IAnyModelType>(
           Object.keys(items).forEach((id) => {
             const ct =
               self.containers.get(id) || AsyncContainer.create({ id } as any);
-            const itemOrError = (items as ReturnValueMap<T>)[id];
+
+            const itemOrError = (items as ReturnValueMap<ITEM>)[id];
             const idx = self.fetchQueue.indexOf(id);
+
             self.fetchQueue.splice(idx, 1);
             if (itemOrError instanceof Error) {
               ct.setFailstate(itemOrError);
@@ -151,8 +163,8 @@ export function createAsyncStore<T extends IAnyModelType>(
           });
           try {
             let items:
-              | ReturnValueArray<T>
-              | ReturnValueMap<T> = yield client.fetchMany(ids);
+              | ReturnValueArray<ITEM>
+              | ReturnValueMap<ITEM> = yield client.fetchMany(ids);
 
             if (Array.isArray(items)) {
               items = items.reduce(
@@ -163,7 +175,7 @@ export function createAsyncStore<T extends IAnyModelType>(
 
             Object.keys(items).forEach((id) => {
               const ct = self.containers.get(id)!;
-              const itemOrError = (items as ReturnValueMap<T>)[id];
+              const itemOrError = (items as ReturnValueMap<ITEM>)[id];
               const idx = self.fetchQueue.indexOf(id);
               self.fetchQueue.splice(idx, 1);
               if (itemOrError instanceof Error) {
@@ -263,7 +275,8 @@ export function createAsyncStore<T extends IAnyModelType>(
     .views((self) => ({
       getOne(id: string) {
         const ct =
-          self.containers.get(id) || AsyncContainer.create({ id } as any);
+          self.containers.get(id)! || AsyncContainer.create({ id } as any);
+
         if (ct.shouldFetch && !self.containers.has(id)) {
           // Hack to fool mobx into allowing side-effects in a view
           nextTick(() => {
