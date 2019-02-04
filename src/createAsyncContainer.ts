@@ -97,6 +97,7 @@ export function createAsyncContainer<T extends IAnyModelType>(
       },
       clearFailstate: () => {
         self.error = undefined;
+        self.expiresAt = Date.now() - 1;
       },
     }))
     .actions((self) => ({
